@@ -9,6 +9,7 @@ A simple Model Context Protocol (MCP) server for managing Proxmox VE environment
   - List physical nodes
   - List virtual machines (QEMU) and containers (LXC)
   - Manage guest power states (start, stop, shutdown, status)
+  - Clone VMs from templates with full Cloud-Init injection (IP, User, Password, SSH keys)
 
 ## Setup & Authentication
 The server requires a Proxmox API Token.
@@ -51,3 +52,9 @@ uvx --from git+https://github.com/edasan0568/proxmox-mcp-server proxmox-mcp-serv
   }
 }
 ```
+
+## Tools Available
+1. `list_nodes`: List all physical nodes in the cluster.
+2. `list_guests`: List all VMs and Containers on a specific node.
+3. `manage_guest`: Start, stop, shutdown, or check status of a specific VM/CT.
+4. `clone_guest`: Clone a VM from a template and apply Cloud-Init configurations.
