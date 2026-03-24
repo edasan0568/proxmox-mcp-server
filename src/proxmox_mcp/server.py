@@ -13,10 +13,13 @@ logger = logging.getLogger("proxmox_mcp")
 
 mcp = FastMCP("Proxmox")
 
-def get_proxmox(host: str) -> ProxmoxAPI:
+def get_proxmox() -> ProxmoxAPI:
+    host = os.environ.get("PROXMOX_HOST")
     token_id = os.environ.get("PROXMOX_TOKEN_ID")
     token_secret = os.environ.get("PROXMOX_TOKEN_SECRET")
     
+    if not host:
+        raise ValueError("Environment variable PROXMOX_HOST must be set (e.g., 192.168.1.100).")
     if not token_id or not token_secret:
         raise ValueError("Environment variables PROXMOX_TOKEN_ID and PROXMOX_TOKEN_SECRET must be set.")
     
@@ -34,15 +37,12 @@ def get_proxmox(host: str) -> ProxmoxAPI:
     )
 
 @mcp.tool()
-def list_nodes(host: str) -> str:
+def list_nodes() -> str:
     """
-    List all physical nodes in the Proxmox cluster.
-    
-    Args:
-        host: IP address or hostname of the Proxmox API server.
+    List all physical nodes in the configured Proxmox cluster.
     """
     try:
-        px = get_proxmox(host)
+        px = get_proxmox()
         nodes = px.nodes.get()
         result = []
         for n in nodes:
@@ -52,16 +52,15 @@ def list_nodes(host: str) -> str:
         return f"Error listing nodes: {str(e)}"
 
 @mcp.tool()
-def list_guests(host: str, node: str) -> str:
+def list_guests(node: str) -> str:
     """
     List all VMs and Containers (Guests) on a specific Proxmox node.
     
     Args:
-        host: IP address or hostname of the Proxmox API server.
         node: Name of the target Proxmox node.
     """
     try:
-        px = get_proxmox(host)
+        px = get_proxmox()
         vms = px.nodes(node).qemu.get()
         cts = px.nodes(node).lxc.get()
         
@@ -78,12 +77,11 @@ def list_guests(host: str, node: str) -> str:
         return f"Error listing guests: {str(e)}"
 
 @mcp.tool()
-def manage_guest(host: str, node: str, vmid: int, guest_type: str, action: str) -> str:
+def manage_guest(node: str, vmid: int, guest_type: str, action: str) -> str:
     """
     Manage the power state of a specific VM or Container.
     
     Args:
-        host: IP address or hostname of the Proxmox API server.
         node: Name of the target Proxmox node.
         vmid: ID of the guest (e.g., 100).
         guest_type: 'qemu' (for VMs) or 'lxc' (for Containers).
@@ -93,7 +91,7 @@ def manage_guest(host: str, node: str, vmid: int, guest_type: str, action: str) 
         return "Error: guest_type must be either 'qemu' or 'lxc'."
         
     try:
-        px = get_proxmox(host)
+        px = get_proxmox()
         resource = px.nodes(node).qemu(vmid) if guest_type == 'qemu' else px.nodes(node).lxc(vmid)
         
         if action == 'status':

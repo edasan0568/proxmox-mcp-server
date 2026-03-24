@@ -3,7 +3,7 @@
 A simple Model Context Protocol (MCP) server for managing Proxmox VE environments via the Proxmox API.
 
 ## Features
-- Connects to any Proxmox host dynamically via arguments
+- Connects to any Proxmox host dynamically via environment variable
 - Disables SSL verification warnings for self-signed certificates (ideal for home labs)
 - Provides tools to:
   - List physical nodes
@@ -15,6 +15,7 @@ The server requires a Proxmox API Token.
 Create a token in the Proxmox GUI (Datacenter > Permissions > API Tokens) for a user with appropriate permissions (e.g., `root@pam`).
 
 Set the following environment variables before running:
+- `PROXMOX_HOST`: The IP address or hostname of your Proxmox server (e.g., `192.168.1.100`)
 - `PROXMOX_TOKEN_ID`: The full token ID (e.g., `root@pam!mytoken`)
 - `PROXMOX_TOKEN_SECRET`: The UUID secret of the token
 
@@ -23,12 +24,13 @@ Set the following environment variables before running:
 You can run this server dynamically using `uvx` without installing it permanently:
 
 ```bash
+PROXMOX_HOST="192.168.1.100" \
 PROXMOX_TOKEN_ID="root@pam!mytoken" \
 PROXMOX_TOKEN_SECRET="your-uuid-secret" \
 uvx --from git+https://github.com/edasan0568/proxmox-mcp-server proxmox-mcp-server
 ```
 
-## MCP Configuration Example (mcp_settings.json for MCPHub)
+## MCP Configuration Example (MCPHub)
 
 ```json
 {
@@ -41,6 +43,7 @@ uvx --from git+https://github.com/edasan0568/proxmox-mcp-server proxmox-mcp-serv
         "proxmox-mcp-server"
       ],
       "env": {
+        "PROXMOX_HOST": "192.168.1.100",
         "PROXMOX_TOKEN_ID": "root@pam!mytoken",
         "PROXMOX_TOKEN_SECRET": "your-uuid-secret"
       }
@@ -48,8 +51,3 @@ uvx --from git+https://github.com/edasan0568/proxmox-mcp-server proxmox-mcp-serv
   }
 }
 ```
-
-## Tools Available
-1. `list_nodes`: List all physical nodes in the cluster.
-2. `list_guests`: List all VMs and Containers on a specific node.
-3. `manage_guest`: Start, stop, shutdown, or check status of a specific VM/CT.
