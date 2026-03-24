@@ -1,0 +1,18 @@
+[project]
+name = "proxmox-mcp-server"
+version = "0.1.0"
+description = "A simple MCP server to manage Proxmox VE via API"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.2.0",
+    "proxmoxer>=2.1.0",
+    "requests>=2.32.3",
+]
+
+[project.scripts]
+proxmox-mcp-server = "proxmox_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
