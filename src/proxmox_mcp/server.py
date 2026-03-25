@@ -20,7 +20,7 @@ def get_proxmox() -> ProxmoxAPI:
     token_secret = os.environ.get("PROXMOX_TOKEN_SECRET")
     
     if not host:
-        raise ValueError("Environment variable PROXMOX_HOST must be set (e.g., 192.168.1.100).")
+        raise ValueError("Environment variable PROXMOX_HOST must be set.")
     if not token_id or not token_secret:
         raise ValueError("Environment variables PROXMOX_TOKEN_ID and PROXMOX_TOKEN_SECRET must be set.")
     
@@ -39,9 +39,7 @@ def get_proxmox() -> ProxmoxAPI:
 
 @mcp.tool()
 def list_nodes() -> str:
-    """
-    List all physical nodes in the configured Proxmox cluster.
-    """
+    """List all physical nodes in the configured Proxmox cluster."""
     try:
         px = get_proxmox()
         nodes = px.nodes.get()
@@ -54,12 +52,7 @@ def list_nodes() -> str:
 
 @mcp.tool()
 def list_guests(node: str) -> str:
-    """
-    List all VMs and Containers (Guests) on a specific Proxmox node.
-    
-    Args:
-        node: Name of the target Proxmox node.
-    """
+    """List all VMs and Containers (Guests) on a specific Proxmox node."""
     try:
         px = get_proxmox()
         vms = px.nodes(node).qemu.get()
@@ -79,33 +72,20 @@ def list_guests(node: str) -> str:
 
 @mcp.tool()
 def manage_guest(node: str, vmid: int, guest_type: str, action: str) -> str:
-    """
-    Manage the power state of a specific VM or Container.
-    
-    Args:
-        node: Name of the target Proxmox node.
-        vmid: ID of the guest (e.g., 100).
-        guest_type: 'qemu' (for VMs) or 'lxc' (for Containers).
-        action: Power action to perform ('start', 'stop', 'shutdown', 'status').
-    """
+    """Manage the power state of a specific VM or Container (start, stop, shutdown, status)."""
     if guest_type not in ['qemu', 'lxc']:
         return "Error: guest_type must be either 'qemu' or 'lxc'."
-        
     try:
         px = get_proxmox()
         resource = px.nodes(node).qemu(vmid) if guest_type == 'qemu' else px.nodes(node).lxc(vmid)
-        
         if action == 'status':
             status = resource.status.current.get()
             return f"Guest {vmid} ({guest_type}) is currently: {status.get('status', 'unknown')}"
-            
         elif action in ['start', 'stop', 'shutdown']:
             resource.status.post(action)
             return f"Successfully executed '{action}' on guest {vmid} ({guest_type})."
-            
         else:
-            return f"Error: Unknown action '{action}'. Use start, stop, shutdown, or status."
-            
+            return f"Error: Unknown action '{action}'."
     except Exception as e:
         return f"Error managing guest: {str(e)}"
 
@@ -115,40 +95,40 @@ def clone_guest(
     vmid: int, 
     source_vmid: int, 
     name: str, 
+    guest_type: str = "qemu",
     full_clone: bool = True,
     ipconfig0: str = None,
     ciuser: str = None,
     cipassword: str = None,
+    net0: str = None,
+    password: str = None,
     sshkeys: str = None,
     start_vm: bool = True
 ) -> str:
     """
-    Clone a VM from a template, configure Cloud-Init, and optionally start it.
+    Clone a VM (QEMU) or Container (LXC) from a template and apply IP/Auth configuration.
     
     Args:
-        node: Name of the target Proxmox node.
-        vmid: ID for the new VM (e.g., 201).
-        source_vmid: ID of the template VM to clone from (e.g., 9000).
-        name: Name of the new VM.
-        full_clone: Whether to perform a full clone (True) or linked clone (False).
-        ipconfig0: Cloud-Init IP config (e.g., 'ip=192.168.1.50/24,gw=192.168.1.1').
-        ciuser: Cloud-Init default username.
-        cipassword: Cloud-Init user password.
-        sshkeys: Cloud-Init SSH public keys (newline separated).
-        start_vm: Whether to start the VM automatically after configuration.
+        guest_type: 'qemu' (VM) or 'lxc' (Container).
+        (QEMU args): ipconfig0, ciuser, cipassword
+        (LXC args): net0 (e.g., 'name=eth0,bridge=vmbr0,ip=192.168.1.50/24,gw=192.168.1.1'), password
+        (Shared args): sshkeys
     """
+    if guest_type not in ['qemu', 'lxc']:
+        return "Error: guest_type must be either 'qemu' or 'lxc'."
+        
     try:
         px = get_proxmox()
+        api_base = px.nodes(node).qemu if guest_type == 'qemu' else px.nodes(node).lxc
         
-        # 1. Clone the VM
-        logger.info(f"Cloning VM {source_vmid} to {vmid} ({name})...")
-        task_upid = px.nodes(node).qemu(source_vmid).clone.post(
-            newid=vmid, 
-            name=name, 
-            full=1 if full_clone else 0
-        )
+        # 1. Clone
+        logger.info(f"Cloning {guest_type} {source_vmid} to {vmid} ({name})...")
+        if guest_type == 'qemu':
+            task_upid = api_base(source_vmid).clone.post(newid=vmid, name=name, full=1 if full_clone else 0)
+        else:
+            task_upid = api_base(source_vmid).clone.post(newid=vmid, hostname=name, full=1 if full_clone else 0)
         
-        # 2. Wait for clone to complete (Proxmox tasks)
+        # 2. Wait for completion
         while True:
             task_status = px.nodes(node).tasks(task_upid).status.get()
             if task_status['status'] == 'stopped':
@@ -158,27 +138,31 @@ def clone_guest(
                     return f"Error: Clone task failed with status {task_status['exitstatus']}"
             time.sleep(3)
             
-        # 3. Configure Cloud-Init
-        logger.info(f"Clone finished. Configuring Cloud-Init for VM {vmid}...")
+        # 3. Configure
+        logger.info(f"Configuring {guest_type} {vmid}...")
         config_params = {}
-        if ipconfig0: config_params['ipconfig0'] = ipconfig0
-        if ciuser: config_params['ciuser'] = ciuser
-        if cipassword: config_params['cipassword'] = cipassword
-        if sshkeys:
-            import urllib.parse
-            # Proxmox API expects sshkeys to be URL encoded
-            config_params['sshkeys'] = urllib.parse.quote(sshkeys, safe='')
+        
+        if guest_type == 'qemu':
+            if ipconfig0: config_params['ipconfig0'] = ipconfig0
+            if ciuser: config_params['ciuser'] = ciuser
+            if cipassword: config_params['cipassword'] = cipassword
+            if sshkeys:
+                import urllib.parse
+                config_params['sshkeys'] = urllib.parse.quote(sshkeys, safe='')
+        else: # LXC
+            if net0: config_params['net0'] = net0
+            if password: config_params['password'] = password
+            if sshkeys: config_params['ssh-public-keys'] = sshkeys
             
         if config_params:
-            px.nodes(node).qemu(vmid).config.post(**config_params)
+            api_base(vmid).config.post(**config_params)
             
-        # 4. Start the VM if requested
+        # 4. Start
         if start_vm:
-            logger.info(f"Starting VM {vmid}...")
-            px.nodes(node).qemu(vmid).status.start.post()
-            return f"Successfully cloned VM {vmid} ('{name}') from template {source_vmid}, configured Cloud-Init, and started the VM."
+            api_base(vmid).status.start.post()
+            return f"Successfully cloned {guest_type} {vmid} ('{name}'), applied config, and started it."
             
-        return f"Successfully cloned VM {vmid} ('{name}') from template {source_vmid} and configured Cloud-Init. VM is currently stopped."
+        return f"Successfully cloned {guest_type} {vmid} ('{name}') and applied config. Guest is stopped."
         
     except Exception as e:
         return f"Error cloning guest: {str(e)}"
