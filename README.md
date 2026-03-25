@@ -57,4 +57,5 @@ uvx --from git+https://github.com/edasan0568/proxmox-mcp-server proxmox-mcp-serv
 1. `list_nodes`: List all physical nodes in the cluster.
 2. `list_guests`: List all VMs and Containers on a specific node.
 3. `manage_guest`: Start, stop, shutdown, or check status of a specific VM/CT.
-4. `clone_guest`: Clone a VM from a template and apply Cloud-Init configurations.
+4. `clone_vm`: Clone a QEMU VM from a template and apply Cloud-Init configurations.
+5. `clone_lxc`: Clone an LXC Container from a template and apply network/password configurations.
