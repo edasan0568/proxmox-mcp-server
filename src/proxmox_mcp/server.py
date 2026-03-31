@@ -153,7 +153,7 @@ def clone_lxc(
         if sshkeys: config_params['ssh-public-keys'] = sshkeys
             
         if config_params:
-            px.nodes(node).lxc(vmid).config.post(**config_params)
+            px.nodes(node).lxc(vmid).config.put(**config_params)
             
         if start_ct:
             px.nodes(node).lxc(vmid).status.start.post()
