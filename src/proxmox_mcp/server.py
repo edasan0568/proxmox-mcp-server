@@ -129,38 +129,47 @@ def clone_vm(
         return f"Error cloning VM: {str(e)}"
 
 @mcp.tool()
-def clone_lxc(
-    node: str, vmid: int, source_vmid: int, name: str, full_clone: bool = True,
-    net0: str = None, password: str = None, sshkeys: str = None, start_ct: bool = True
+def create_lxc(
+    node: str, vmid: int, ostemplate: str, name: str,
+    password: str = None, sshkeys: str = None, net0: str = None,
+    rootfs: str = "local-lvm:8", memory: int = 512, cores: int = 1,
+    start_ct: bool = True
 ) -> str:
-    """Clone an LXC Container from a template and apply Network/Auth config."""
+    """Create an LXC Container directly from an OS template tarball (e.g. local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst)."""
     try:
         px = get_proxmox()
-        logger.info(f"Cloning LXC {source_vmid} to {vmid} ({name})...")
-        task_upid = px.nodes(node).lxc(source_vmid).clone.post(newid=vmid, hostname=name, full=1 if full_clone else 0)
+        logger.info(f"Creating LXC {vmid} ({name}) from {ostemplate}...")
+        
+        create_params = {
+            'vmid': vmid,
+            'ostemplate': ostemplate,
+            'hostname': name,
+            'rootfs': rootfs,
+            'memory': memory,
+            'cores': cores
+        }
+        if password: create_params['password'] = password
+        if sshkeys:
+            import urllib.parse
+            create_params['ssh-public-keys'] = urllib.parse.quote(sshkeys, safe='')
+        if net0: create_params['net0'] = net0
+        
+        task_upid = px.nodes(node).lxc.post(**create_params)
         
         while True:
             task_status = px.nodes(node).tasks(task_upid).status.get()
             if task_status['status'] == 'stopped':
                 if task_status['exitstatus'] == 'OK': break
-                else: return f"Error: Clone task failed with status {task_status['exitstatus']}"
+                else: return f"Error: Create task failed with status {task_status['exitstatus']}"
             time.sleep(3)
-            
-        logger.info(f"Configuring LXC {vmid}...")
-        config_params = {}
-        if net0: config_params['net0'] = net0
-        if sshkeys: config_params['ssh-public-keys'] = sshkeys
-            
-        if config_params:
-            px.nodes(node).lxc(vmid).config.put(**config_params)
             
         if start_ct:
             px.nodes(node).lxc(vmid).status.start.post()
-            return f"Successfully cloned LXC {vmid} ('{name}'), applied config, and started it."
+            return f"Successfully created LXC {vmid} ('{name}') from {ostemplate} and started it."
             
-        return f"Successfully cloned LXC {vmid} ('{name}') and applied config. Container is stopped."
+        return f"Successfully created LXC {vmid} ('{name}'). Container is stopped."
     except Exception as e:
-        return f"Error cloning LXC: {str(e)}"
+        return f"Error creating LXC: {str(e)}"
 
 def main():
     mcp.run()
