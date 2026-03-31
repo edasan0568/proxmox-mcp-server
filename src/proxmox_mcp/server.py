@@ -149,7 +149,6 @@ def clone_lxc(
         logger.info(f"Configuring LXC {vmid}...")
         config_params = {}
         if net0: config_params['net0'] = net0
-        if password: config_params['password'] = password
         if sshkeys: config_params['ssh-public-keys'] = sshkeys
             
         if config_params:
