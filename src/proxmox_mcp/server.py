@@ -133,9 +133,10 @@ def create_lxc(
     node: str, vmid: int, ostemplate: str, name: str,
     password: str = None, sshkeys: str = None, net0: str = None,
     rootfs: str = "local-lvm:8", memory: int = 512, cores: int = 1,
+    nesting: bool = True,
     start_ct: bool = True
 ) -> str:
-    """Create an LXC Container directly from an OS template tarball (e.g. local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst)."""
+    """Create an LXC Container directly from an OS template tarball (e.g., with Features Nesting enabled) (e.g. local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst)."""
     try:
         px = get_proxmox()
         logger.info(f"Creating LXC {vmid} ({name}) from {ostemplate}...")
@@ -148,6 +149,9 @@ def create_lxc(
             'memory': memory,
             'cores': cores
         }
+        if nesting:
+            create_params['features'] = 'nesting=1'
+            
         if password: create_params['password'] = password
         if sshkeys:
             import urllib.parse
