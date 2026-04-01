@@ -133,7 +133,7 @@ def create_lxc(
     node: str, vmid: int, ostemplate: str, name: str,
     password: str = None, sshkeys: str = None, net0: str = None,
     rootfs: str = "local-lvm:8", memory: int = 512, cores: int = 1,
-    nesting: bool = True, unprivileged: bool = False,
+    nesting: bool = True, unprivileged: bool = True,
     start_ct: bool = True
 ) -> str:
     """Create an LXC Container directly from an OS template tarball."""
