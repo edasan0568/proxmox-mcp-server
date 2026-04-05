@@ -115,7 +115,7 @@ def clone_vm(
         if cipassword: config_params['cipassword'] = cipassword
         if sshkeys:
             import urllib.parse
-            config_params['sshkeys'] = urllib.parse.quote(sshkeys, safe='')
+            config_params['sshkeys'] = sshkeys
             
         if config_params:
             px.nodes(node).qemu(vmid).config.post(**config_params)
@@ -156,7 +156,7 @@ def create_lxc(
         if password: create_params['password'] = password
         if sshkeys:
             import urllib.parse
-            create_params['ssh-public-keys'] = urllib.parse.quote(sshkeys, safe='')
+            create_params['ssh-public-keys'] = sshkeys
         if net0: create_params['net0'] = net0
         
         task_upid = px.nodes(node).lxc.post(**create_params)
